@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgadmin
+  namespace: icgroup
+data:
+  servers.json: |
+    {
+      "Servers": {
+          "1": {
+              "Name": "Odoo DB",
+              "Group": "Servers",
+              "Host": "db",
+              "Port": 5432,
+              "MaintenanceDB": "postgres",
+              "Username": "odoo",
+              "PassFile": "/var/lib/pgadmin/pgpass/pgpass",
+              "SSLMode": "prefer"
+          }
+      }
+    }
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgadmin-mdp
+  namespace: icgroup
+data:
+  pgpass: | 
+    db:5432:postgres:bose3
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgadmin-config
+  namespace: icgroup
+data:
+  PGADMIN_DEFAULT_EMAIL: ali.devops8@gmail.com
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pgadmin-secret
+  namespace: icgroup
+type: Opaque
+data:
+  PGADMIN_DEFAULT_PASSWORD: Ym9zZTM=
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgadmin-deployment
+  namespace: icgroup
+  labels:
+    environment: prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pgadmin
+  template:
+    metadata:
+      labels:
+        app: pgadmin
+        environment: prod
+    spec:
+      containers:
+      - name: pgadmin
+        image: dpage/pgadmin4:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: PGADMIN_DEFAULT_EMAIL
+          valueFrom:
+            configMapKeyRef:
+              name: pgadmin-config
+              key: PGADMIN_DEFAULT_EMAIL
+        - name: PGADMIN_DEFAULT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pgadmin-secret
+              key: PGADMIN_DEFAULT_PASSWORD
+        volumeMounts:
+        - name: pgadmin-config
+          mountPath: /pgadmin4/servers.json
+          subPath: servers.json
+        - name: pgadmin-mdp
+          mountPath: /var/lib/pgadmin/pgpass/pgpass
+          subPath: pgpass
+      volumes:
+      - name: pgadmin-config
+        configMap:
+          name: pgadmin
+      - name: pgadmin-mdp
+        configMap:
+          name: pgadmin-mdp       
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgadmin-service
+  namespace: icgroup
+spec:
+  selector:
+    app: pgadmin
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 80
